@@ -408,7 +408,7 @@ struct HfCorrelatorLcHadrons {
     int64_t timeStamp = bc.timestamp();
 
     float cent=evaluateCentralityColl(collision);
-    float zv=collision.posZ();
+
 
     int poolBin = corrBinning.getBin(std::make_tuple(collision.posZ(), collision.multFT0M()));
     int nTracks = 0;
@@ -503,8 +503,7 @@ struct HfCorrelatorLcHadrons {
                             correlationStatus);
           entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
-			    cent,
-			    zv);
+			    cent);
           entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
           entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), false);
           entryLcHadronGenInfo(false, false, 0);
@@ -523,8 +522,7 @@ struct HfCorrelatorLcHadrons {
                             correlationStatus);
           entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
-			    cent,
-			    zv);
+			    cent);
           entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
           entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), false);
           entryLcHadronGenInfo(false, false, 0);
