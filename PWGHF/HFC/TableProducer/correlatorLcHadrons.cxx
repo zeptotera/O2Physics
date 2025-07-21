@@ -16,7 +16,6 @@
 /// \author Zhen Zhang <zhenz@cern.ch>
 /// \author Ravindra Singh <ravindra.singh@cern.ch>
 
-#include "PWGHF/Core/CentralityEstimation.h"
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
 #include "PWGHF/Core/SelectorCuts.h"
@@ -28,7 +27,6 @@
 
 #include "Common/CCDB/EventSelectionParams.h"
 #include "Common/Core/RecoDecay.h"
-#include "Common/Core/TrackSelection.h"
 #include "Common/DataModel/Centrality.h"
 #include "Common/DataModel/EventSelection.h"
 #include "Common/DataModel/Multiplicity.h"
@@ -36,24 +34,23 @@
 #include "Common/DataModel/PIDResponseTPC.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
-#include "CommonConstants/PhysicsConstants.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/O2DatabasePDGPlugin.h"
-#include "Framework/runDataProcessing.h"
 #include <CommonConstants/MathConstants.h>
+#include <CommonConstants/PhysicsConstants.h>
 #include <Framework/ASoAHelpers.h>
 #include <Framework/AnalysisDataModel.h>
 #include <Framework/AnalysisHelpers.h>
+#include <Framework/AnalysisTask.h>
 #include <Framework/BinningPolicy.h>
 #include <Framework/Configurable.h>
 #include <Framework/GroupedCombinations.h>
+#include <Framework/HistogramRegistry.h>
 #include <Framework/HistogramSpec.h>
 #include <Framework/InitContext.h>
+#include <Framework/O2DatabasePDGPlugin.h>
 #include <Framework/OutputObjHeader.h>
+#include <Framework/runDataProcessing.h>
 #include <ReconstructionDataFormats/PID.h>
 
-#include "TRandom3.h"
 #include <TPDGCode.h>
 #include <TRandom3.h>
 
@@ -493,18 +490,16 @@ struct HfCorrelatorLcHadrons {
                             candidate.pt() * chargeLc,
                             track.pt() * track.sign(),
                             poolBin,
-                            correlationStatus);
-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
                             cent);
-                            entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
-                            entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), false);
-                            entryLcHadronGenInfo(false, false, 0);
-                            entryLcHadronMlInfo(outputMl[0], outputMl[1]);
-                            entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
-                            if (fillTrkPID) {
-                              entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
-                            }
+          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
+          entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), false);
+          entryLcHadronGenInfo(false, false, 0);
+          entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+          entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
+          if (fillTrkPID) {
+            entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+          }
         }
         if (candidate.isSelLcToPiKP() >= selectionFlagLc) {
           entryLcHadronPair(getDeltaPhi(track.phi(), candidate.phi()),
@@ -512,18 +507,16 @@ struct HfCorrelatorLcHadrons {
                             candidate.pt() * chargeLc,
                             track.pt() * track.sign(),
                             poolBin,
-                            correlationStatus);
-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
                             cent);
-                            entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
-                            entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), false);
-                            entryLcHadronGenInfo(false, false, 0);
-                            entryLcHadronMlInfo(outputMl[0], outputMl[1]);
-                            entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
-                            if (fillTrkPID) {
-                              entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
-                            }
+          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
+          entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), false);
+          entryLcHadronGenInfo(false, false, 0);
+          entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+          entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
+          if (fillTrkPID) {
+            entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+          }
         }
         if (countLc == 0) {
           if (!skipMixedEventTableFilling) {
@@ -754,32 +747,30 @@ struct HfCorrelatorLcHadrons {
                             candidate.pt() * chargeLc,
                             track.pt() * track.sign(),
                             poolBin,
-                            correlationStatus);
-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
                             cent);
-                            entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
-                            entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), isLcSignal);
-                            if (fillTrkPID) {
-                              entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
-                            }
-                            entryLcHadronMlInfo(outputMl[0], outputMl[1]);
-                            if (track.has_mcParticle()) {
-                              auto mcParticle = track.template mcParticle_as<aod::McParticles>();
-                              isPhysicalPrimary = mcParticle.isPhysicalPrimary();
-                              trackOrigin = RecoDecay::getCharmHadronOrigin(mcParticles, mcParticle, true);
-                              entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
-                            } else {
-                              entryLcHadronGenInfo(isLcPrompt, false, 0);
-                              registry.fill(HIST("hFakeTracksMcRec"), track.pt());
-                            }
+          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
+          entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), isLcSignal);
+          if (fillTrkPID) {
+            entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+          }
+          entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+          if (track.has_mcParticle()) {
+            auto mcParticle = track.template mcParticle_as<aod::McParticles>();
+            isPhysicalPrimary = mcParticle.isPhysicalPrimary();
+            trackOrigin = RecoDecay::getCharmHadronOrigin(mcParticles, mcParticle, true);
+            entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
+          } else {
+            entryLcHadronGenInfo(isLcPrompt, false, 0);
+            registry.fill(HIST("hFakeTracksMcRec"), track.pt());
+          }
 
-                            // for secondary particle fraction estimation
-                            registry.fill(HIST("hPtParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
-                            if (isPhysicalPrimary) {
-                              registry.fill(HIST("hPtPrimaryParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
-                            }
-                            entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
+          // for secondary particle fraction estimation
+          registry.fill(HIST("hPtParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
+          if (isPhysicalPrimary) {
+            registry.fill(HIST("hPtPrimaryParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
+          }
+          entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
         }
         if (candidate.isSelLcToPiKP() >= selectionFlagLc) {
           entryLcHadronPair(getDeltaPhi(track.phi(), candidate.phi()),
@@ -787,31 +778,29 @@ struct HfCorrelatorLcHadrons {
                             candidate.pt() * chargeLc,
                             track.pt() * track.sign(),
                             poolBin,
-                            correlationStatus);
-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
                             correlationStatus,
                             cent);
-                            entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
-                            entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), isLcSignal);
-                            if (fillTrkPID) {
-                              entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
-                            }
-                            entryLcHadronMlInfo(outputMl[0], outputMl[1]);
-                            if (track.has_mcParticle()) {
-                              auto mcParticle = track.template mcParticle_as<aod::McParticles>();
-                              isPhysicalPrimary = mcParticle.isPhysicalPrimary();
-                              trackOrigin = RecoDecay::getCharmHadronOrigin(mcParticles, mcParticle, true);
-                              entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
-                            } else {
-                              entryLcHadronGenInfo(isLcPrompt, false, 0);
-                              registry.fill(HIST("hFakeTracksMcRec"), track.pt());
-                            }
-                            // for secondary particle fraction estimation
-                            registry.fill(HIST("hPtParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
-                            if (isPhysicalPrimary) {
-                              registry.fill(HIST("hPtPrimaryParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
-                            }
-                            entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
+          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
+          entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), isLcSignal);
+          if (fillTrkPID) {
+            entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+          }
+          entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+          if (track.has_mcParticle()) {
+            auto mcParticle = track.template mcParticle_as<aod::McParticles>();
+            isPhysicalPrimary = mcParticle.isPhysicalPrimary();
+            trackOrigin = RecoDecay::getCharmHadronOrigin(mcParticles, mcParticle, true);
+            entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
+          } else {
+            entryLcHadronGenInfo(isLcPrompt, false, 0);
+            registry.fill(HIST("hFakeTracksMcRec"), track.pt());
+          }
+          // for secondary particle fraction estimation
+          registry.fill(HIST("hPtParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
+          if (isPhysicalPrimary) {
+            registry.fill(HIST("hPtPrimaryParticleAssocVsCandMcRec"), track.pt(), candidate.pt());
+          }
+          entryTrackRecoInfo(track.dcaXY(), track.dcaZ(), track.tpcNClsCrossedRows());
         }
       } // end inner loop (Tracks)
       countLc++;
