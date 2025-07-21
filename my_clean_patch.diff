@@ -1,0 +1,671 @@
+diff --git a/PWGHF/HFC/DataModel/CorrelationTables.h b/PWGHF/HFC/DataModel/CorrelationTables.h
+index a77035b7f..bf6e83cdd 100644
+--- a/PWGHF/HFC/DataModel/CorrelationTables.h
++++ b/PWGHF/HFC/DataModel/CorrelationTables.h
+@@ -16,13 +16,13 @@
+ #ifndef PWGHF_HFC_DATAMODEL_CORRELATIONTABLES_H_
+ #define PWGHF_HFC_DATAMODEL_CORRELATIONTABLES_H_
+
+-#include "PWGHF/DataModel/CandidateReconstructionTables.h" // IWYU pragma: keep
++#include "PWGHF/DataModel/CandidateReconstructionTables.h" // NOLINT
+
+ #include "Common/Core/RecoDecay.h"
+
+ #include <CommonConstants/MathConstants.h>
+ #include <Framework/ASoA.h>
+-#include <Framework/AnalysisDataModel.h>
++#include <Framework/AnalysisDataModel.h> // NOLINT
+
+ #include <cstdint>
+
+@@ -161,12 +161,14 @@ DECLARE_SOA_COLUMN(IsSignal, isSignal, bool);                              //! U
+ DECLARE_SOA_COLUMN(IsPrompt, isPrompt, bool);                              //! Used in MC-Rec, Lc Prompt or Non-Prompt
+ DECLARE_SOA_COLUMN(IsPhysicalPrimary, isPhysicalPrimary, bool);            //! Used in MC-Rec, primary associated particles
+ DECLARE_SOA_COLUMN(IsAutoCorrelated, isAutoCorrelated, bool);              //! Correlation Status
+-DECLARE_SOA_COLUMN(PrNsigmTPC, prNsigmTPC, float);                         //! Associated Particle TPC nSigma proton
+-DECLARE_SOA_COLUMN(KaNsigmTPC, kaNsigmTPC, float);                         //! Associated Particle TPC nSigma Kaon
+-DECLARE_SOA_COLUMN(PiNsigmTPC, piNsigmTPC, float);                         //! Associated Particle TPC nSigma Pion
+-DECLARE_SOA_COLUMN(PrNsigmTOF, prNsigmTOF, float);                         //! Associated Particle TOF nSigma Proton
+-DECLARE_SOA_COLUMN(KaNsigmTOF, kaNsigmTOF, float);                         //! Associated Particle TOF nSigma Kaon
+-DECLARE_SOA_COLUMN(PiNsigmTOF, piNsigmTOF, float);                         //! Associated Particle TOF nSigma Pion
++DECLARE_SOA_COLUMN(Cent, cent, float);
++DECLARE_SOA_COLUMN(Zv, zv, float);
++DECLARE_SOA_COLUMN(PrNsigmTPC, prNsigmTPC, float); //! Associated Particle TPC nSigma proton
++DECLARE_SOA_COLUMN(KaNsigmTPC, kaNsigmTPC, float); //! Associated Particle TPC nSigma Kaon
++DECLARE_SOA_COLUMN(PiNsigmTPC, piNsigmTPC, float); //! Associated Particle TPC nSigma Pion
++DECLARE_SOA_COLUMN(PrNsigmTOF, prNsigmTOF, float); //! Associated Particle TOF nSigma Proton
++DECLARE_SOA_COLUMN(KaNsigmTOF, kaNsigmTOF, float); //! Associated Particle TOF nSigma Kaon
++DECLARE_SOA_COLUMN(PiNsigmTOF, piNsigmTOF, float); //! Associated Particle TOF nSigma Pion
+ } // namespace hf_correlation_lc_hadron
+
+ DECLARE_SOA_TABLE(LcHadronPair, "AOD", "LCHPAIR", //! Lc-Hadrons pairs Informations
+@@ -175,7 +177,8 @@ DECLARE_SOA_TABLE(LcHadronPair, "AOD", "LCHPAIR", //! Lc-Hadrons pairs Informati
+                   aod::hf_correlation_lc_hadron::PtLc,
+                   aod::hf_correlation_lc_hadron::PtHadron,
+                   aod::hf_correlation_lc_hadron::PoolBin,
+-                  aod::hf_correlation_lc_hadron::IsAutoCorrelated);
++                  aod::hf_correlation_lc_hadron::IsAutoCorrelated,
++                  aod::hf_correlation_lc_hadron::Cent);
+
+ DECLARE_SOA_TABLE(LcHadronRecoInfo, "AOD", "LCHRECOINFO", //! Lc-Hadrons pairs Reconstructed Informations
+                   aod::hf_correlation_lc_hadron::MLc,
+diff --git a/PWGHF/HFC/TableProducer/correlatorLcHadrons.cxx b/PWGHF/HFC/TableProducer/correlatorLcHadrons.cxx
+index 227705028..3fd3931ec 100644
+--- a/PWGHF/HFC/TableProducer/correlatorLcHadrons.cxx
++++ b/PWGHF/HFC/TableProducer/correlatorLcHadrons.cxx
+@@ -16,46 +16,27 @@
+ /// \author Zhen Zhang <zhenz@cern.ch>
+ /// \author Ravindra Singh <ravindra.singh@cern.ch>
+
+-#include "PWGHF/Core/DecayChannels.h"
+ #include "PWGHF/Core/HfHelper.h"
+ #include "PWGHF/Core/SelectorCuts.h"
+ #include "PWGHF/DataModel/CandidateReconstructionTables.h"
+ #include "PWGHF/DataModel/CandidateSelectionTables.h"
+ #include "PWGHF/HFC/DataModel/CorrelationTables.h"
+ #include "PWGHF/HFC/Utils/utilsCorrelations.h"
+-#include "PWGHF/Utils/utilsAnalysis.h"
+
+-#include "Common/CCDB/EventSelectionParams.h"
+-#include "Common/Core/RecoDecay.h"
++#include "Common/Core/TrackSelection.h"
++#include "Common/DataModel/Centrality.h"
+ #include "Common/DataModel/EventSelection.h"
+ #include "Common/DataModel/Multiplicity.h"
+-#include "Common/DataModel/PIDResponseTOF.h"
+-#include "Common/DataModel/PIDResponseTPC.h"
+ #include "Common/DataModel/TrackSelectionTables.h"
+
+-#include <CommonConstants/MathConstants.h>
+-#include <CommonConstants/PhysicsConstants.h>
+-#include <Framework/ASoAHelpers.h>
+-#include <Framework/AnalysisDataModel.h>
+-#include <Framework/AnalysisHelpers.h>
+-#include <Framework/AnalysisTask.h>
+-#include <Framework/BinningPolicy.h>
+-#include <Framework/Configurable.h>
+-#include <Framework/GroupedCombinations.h>
+-#include <Framework/HistogramRegistry.h>
+-#include <Framework/HistogramSpec.h>
+-#include <Framework/InitContext.h>
+-#include <Framework/O2DatabasePDGPlugin.h>
+-#include <Framework/OutputObjHeader.h>
+-#include <Framework/runDataProcessing.h>
+-#include <ReconstructionDataFormats/PID.h>
+-
+-#include <TPDGCode.h>
+-#include <TRandom3.h>
+-
+-#include <array>
+-#include <cstdint>
+-#include <cstdlib>
++#include "CommonConstants/PhysicsConstants.h"
++#include "Framework/AnalysisTask.h"
++#include "Framework/HistogramRegistry.h"
++#include "Framework/O2DatabasePDGPlugin.h"
++#include "Framework/runDataProcessing.h"
++
++#include "TRandom3.h"
++
+ #include <vector>
+
+ using namespace o2;
+@@ -88,11 +69,13 @@ struct HfCorrelatorLcHadronsSelection {
+   Configurable<int> selectionFlagLc{"selectionFlagLc", 1, "Selection Flag for Lc"};
+   Configurable<float> yCandMax{"yCandMax", 0.8, "max. cand. rapidity"};
+   Configurable<float> ptCandMin{"ptCandMin", 1., "min. cand. pT"};
++  Configurable<float> centMin{"centMin", 0., "Minimum Centrality"};
++  Configurable<float> centMax{"centMax", 100., "Maximum Centrality"};
+
+   HfHelper hfHelper;
+   SliceCache cache;
+
+-  using SelCollisions = soa::Join<aod::Collisions, aod::EvSels>;
++  using SelCollisions = soa::Join<aod::Collisions, aod::EvSels, aod::CentFT0Ms>;
+   using CandidatesLcData = soa::Filtered<soa::Join<aod::HfCand3Prong, aod::HfSelLc>>;
+   using CandidatesLcMcRec = soa::Filtered<soa::Join<aod::HfCand3Prong, aod::HfSelLc, aod::HfCand3ProngMcRec>>;
+   using CandidatesLcMcGen = soa::Join<aod::McParticles, aod::HfCand3ProngMcGen>;
+@@ -108,6 +91,7 @@ struct HfCorrelatorLcHadronsSelection {
+     bool isLcFound = true;
+     bool isSel8 = true;
+     bool isNosameBunchPileUp = true;
++    bool isCentInRange = false;
+     if (doSelLcCollision) {
+       for (const auto& candidate : candidates) {
+         if (std::abs(hfHelper.yLc(candidate)) > yCandMax || candidate.pt() < ptCandMin) {
+@@ -118,13 +102,18 @@ struct HfCorrelatorLcHadronsSelection {
+         break;
+       }
+     }
++
++    float cent = collision.centFT0M();
++
+     if (useSel8) {
+       isSel8 = collision.sel8();
+     }
+     if (selNoSameBunchPileUpColl) {
+       isNosameBunchPileUp = static_cast<bool>(collision.selection_bit(o2::aod::evsel::kNoSameBunchPileup));
+     }
+-    isSelColl = isLcFound && isSel8 && isNosameBunchPileUp;
++
++    isCentInRange = (cent >= centMin && cent < centMax);
++    isSelColl = isLcFound && isSel8 && isNosameBunchPileUp && isCentInRange;
+     lcSel(isSelColl);
+   }
+   PROCESS_SWITCH(HfCorrelatorLcHadronsSelection, processLcSelectionData, "Process Lc Collision Selection Data", true);
+@@ -226,17 +215,18 @@ struct HfCorrelatorLcHadrons {
+   Configurable<bool> isRecTrkPhyPrimary{"isRecTrkPhyPrimary", true, "Calculate the efficiency of reconstructed primary physical tracks"};
+   Configurable<bool> calEffLcEvent{"calEffLcEvent", true, "Calculate the efficiency of Lc candidate"};
+   Configurable<float> eventFractionToAnalyze{"eventFractionToAnalyze", -1, "Fraction of events to analyze (use only for ME offline on very large samples)"};
++  Configurable<bool> isMultiplicityDependent{"isMultiplicityDependent", false, "Flag for multiplicity dependent analyses"};
+
+   HfHelper hfHelper;
+   SliceCache cache;
+   Service<o2::framework::O2DatabasePDG> pdg;
+   int leadingIndex = 0;
+   bool correlationStatus = false;
+-  static constexpr std::size_t NDaughters{3u};
++  static constexpr size_t nDaughters{3u};
+   TRandom3* rnd = new TRandom3(0);
+
+   // Event Mixing for the Data Mode
+-  using SelCollisionsWithLc = soa::Filtered<soa::Join<aod::Collisions, aod::Mults, aod::EvSels, aod::LcSelection>>;
++  using SelCollisionsWithLc = soa::Filtered<soa::Join<aod::Collisions, aod::Mults, aod::EvSels, aod::LcSelection, aod::CentFT0Ms>>;
+   using SelCollisionsWithLcMc = soa::Filtered<soa::Join<aod::McCollisions, aod::LcSelection, aod::MultsExtraMC>>; // collisionFilter applied
+   using CandidatesLcData = soa::Filtered<soa::Join<aod::HfCand3Prong, aod::HfSelLc, aod::HfMlLcToPKPi>>;
+   // Event Mixing for the MCRec Mode
+@@ -253,10 +243,8 @@ struct HfCorrelatorLcHadrons {
+   Filter lcFilter = ((o2::aod::hf_track_index::hfflag & static_cast<uint8_t>(1 << aod::hf_cand_3prong::DecayType::LcToPKPi)) != static_cast<uint8_t>(0)) && (aod::hf_sel_candidate_lc::isSelLcToPKPi >= selectionFlagLc || aod::hf_sel_candidate_lc::isSelLcToPiKP >= selectionFlagLc);
+   Filter trackFilter = (nabs(aod::track::eta) < etaTrackMax) && (nabs(aod::track::pt) > ptTrackMin) && (nabs(aod::track::dcaXY) < dcaXYTrackMax) && (nabs(aod::track::dcaZ) < dcaZTrackMax);
+
++  // Preslice<aod::McParticles> perTrueCollision = o2::aod::mcparticle::McCollisionId;
+   Preslice<aod::McParticles> perTrueCollision = o2::aod::mcparticle::mcCollisionId;
+-  Preslice<aod::Tracks> perCollisionID = aod::track::collisionId;
+-  Preslice<aod::HfCand3Prong> cand3ProngPerCol = aod::hf_cand::collisionId;
+-
+   // configurable axis definition
+   ConfigurableAxis binsMultiplicity{"binsMultiplicity", {VARIABLE_WIDTH, 0.0f, 2000.0f, 6000.0f, 100000.0f}, "Mixing bins - multiplicity"};
+   ConfigurableAxis binsZVtx{"binsZVtx", {VARIABLE_WIDTH, -10.0f, -2.5f, 2.5f, 10.0f}, "Mixing bins - z-vertex"};
+@@ -267,6 +255,7 @@ struct HfCorrelatorLcHadrons {
+   ConfigurableAxis binsPoolBin{"binsPoolBin", {9, 0., 9.}, "PoolBin"};
+   ConfigurableAxis binsMultFT0M{"binsMultFT0M", {600, 0., 6000.}, "Multiplicity as FT0M signal amplitude"};
+   ConfigurableAxis binsMassLc{"binsMassLc", {200, 1.98, 2.58}, "inv. mass (p K #pi) (GeV/#it{c}^{2})"};
++  ConfigurableAxis binsCentFt0m{"binsCentFt0m", {100, 0., 100.}, "Centrality percentile (FT0M)"};
+
+   BinningType corrBinning{{binsZVtx, binsMultiplicity}, true};
+
+@@ -286,6 +275,7 @@ struct HfCorrelatorLcHadrons {
+     AxisSpec axisPoolBin = {binsPoolBin, "PoolBin"};
+     AxisSpec axisRapidity = {100, -2, 2, "Rapidity"};
+     AxisSpec axisSign = {2, -1, 1, "Sign"};
++    AxisSpec axisCent = {binsCentFt0m, "Centrality"};
+
+     registry.add("hPtCand", "Lc,Hadron candidates;candidate #it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtLc}});
+     registry.add("hPtProng0", "Lc,Hadron candidates;prong 0 #it{p}_{T} (GeV/#it{c});entries", {HistType::kTH1F, {axisPtLc}});
+@@ -301,9 +291,14 @@ struct HfCorrelatorLcHadrons {
+     registry.add("hMultiplicity", "multiplicity;multiplicity;entries", {HistType::kTH1F, {{10000, 0., 10000.}}});
+     registry.add("hMultFT0M", "multiplicity;multiplicity;entries", {HistType::kTH1F, {{10000, 0., 10000.}}});
+     registry.add("hZvtx", "z vertex;z vertex;entries", {HistType::kTH1F, {{200, -20., 20.}}});
++    registry.add("hCentFT0M", "Centrality FT0M; Centrality;entries", {HistType::kTH1D, {{100, 0., 100.}}});
+     registry.add("hLcBin", "Lc selected in pool Bin;pool Bin;entries", {HistType::kTH1F, {{9, 0., 9.}}});
+     registry.add("hTracksBin", "Tracks selected in pool Bin;pool Bin;entries", {HistType::kTH1F, {{9, 0., 9.}}});
+-    registry.add("hMassLcVsPt", "Lc candidates;inv. mass (p K #pi) (GeV/#it{c}^{2});entries", {HistType::kTH2F, {{axisMassLc}, {axisPtLc}}});
++    if (isMultiplicityDependent) {
++      registry.add("hMassLcVsPtvsmult", "Lc candidates;inv. mass (p K #pi) (GeV/#it{c}^{2});entries", {HistType::kTH3F, {{axisMassLc}, {axisPtLc}, {axisCent}}});
++    } else {
++      registry.add("hMassLcVsPt", "Lc candidates;inv. mass (p K #pi) (GeV/#it{c}^{2});entries", {HistType::kTH2F, {{axisMassLc}, {axisPtLc}}});
++    }
+     registry.add("hMassLcData", "Lc candidates;inv. mass (p K #pi) (GeV/#it{c}^{2});entries", {HistType::kTH1F, {{axisMassLc}}});
+     registry.add("hLcPoolBin", "Lc candidates pool bin", {HistType::kTH1F, {axisPoolBin}});
+     registry.add("hTracksPoolBin", "Particles associated pool bin", {HistType::kTH1F, {axisPoolBin}});
+@@ -346,7 +341,6 @@ struct HfCorrelatorLcHadrons {
+     registry.add("hEtaMcGen", "Lc,Hadron particles - MC Gen", {HistType::kTH1F, {axisEta}});
+     registry.add("hPhiMcGen", "Lc,Hadron particles - MC Gen", {HistType::kTH1F, {axisPhi}});
+     registry.add("hMultFT0AMcGen", "Lc,Hadron multiplicity FT0A - MC Gen", {HistType::kTH1F, {axisMultiplicity}});
+-
+     corrBinning = {{binsZVtx, binsMultiplicity}, true};
+   }
+
+@@ -374,6 +368,8 @@ struct HfCorrelatorLcHadrons {
+     int gCollisionId = collision.globalIndex();
+     int64_t timeStamp = bc.timestamp();
+
++    float cent = collision.centFT0M();
++
+     int poolBin = corrBinning.getBin(std::make_tuple(collision.posZ(), collision.multFT0M()));
+     int nTracks = 0;
+     if (collision.numContrib() > 1) {
+@@ -412,8 +408,13 @@ struct HfCorrelatorLcHadrons {
+       registry.fill(HIST("hPhi"), RecoDecay::constrainAngle(candidate.phi(), -PIHalf));
+       registry.fill(HIST("hY"), hfHelper.yLc(candidate));
+       registry.fill(HIST("hLcBin"), poolBin);
++
+       if (candidate.isSelLcToPKPi() >= selectionFlagLc) {
+-        registry.fill(HIST("hMassLcVsPt"), hfHelper.invMassLcToPKPi(candidate), candidate.pt(), efficiencyWeightLc);
++        if (isMultiplicityDependent) {
++          registry.fill(HIST("hMassLcVsPtvsmult"), hfHelper.invMassLcToPKPi(candidate), candidate.pt(), cent, efficiencyWeightLc);
++        } else {
++          registry.fill(HIST("hMassLcVsPt"), hfHelper.invMassLcToPKPi(candidate), candidate.pt(), efficiencyWeightLc);
++        }
+         registry.fill(HIST("hMassLcData"), hfHelper.invMassLcToPKPi(candidate), efficiencyWeightLc);
+         registry.fill(HIST("hSelectionStatusLcToPKPi"), candidate.isSelLcToPKPi());
+         for (unsigned int iclass = 0; iclass < classMl->size(); iclass++) {
+@@ -423,7 +424,11 @@ struct HfCorrelatorLcHadrons {
+         entryLc(candidate.phi(), candidate.eta(), candidate.pt() * chargeLc, hfHelper.invMassLcToPKPi(candidate), poolBin, gCollisionId, timeStamp);
+       }
+       if (candidate.isSelLcToPiKP() >= selectionFlagLc) {
+-        registry.fill(HIST("hMassLcVsPt"), hfHelper.invMassLcToPiKP(candidate), candidate.pt(), efficiencyWeightLc);
++        if (isMultiplicityDependent) {
++          registry.fill(HIST("hMassLcVsPtvsmult"), hfHelper.invMassLcToPKPi(candidate), candidate.pt(), cent, efficiencyWeightLc);
++        } else {
++          registry.fill(HIST("hMassLcVsPt"), hfHelper.invMassLcToPKPi(candidate), candidate.pt(), efficiencyWeightLc);
++        }
+         registry.fill(HIST("hMassLcData"), hfHelper.invMassLcToPiKP(candidate), efficiencyWeightLc);
+         registry.fill(HIST("hSelectionStatusLcToPiKP"), candidate.isSelLcToPiKP());
+         for (unsigned int iclass = 0; iclass < classMl->size(); iclass++) {
+@@ -463,8 +468,9 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             track.pt() * track.sign(),
+                             poolBin,
+-                            correlationStatus);
+-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
++                            correlationStatus,
++                            cent);
++          entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), false);
+           entryLcHadronGenInfo(false, false, 0);
+           entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+@@ -479,8 +485,9 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             track.pt() * track.sign(),
+                             poolBin,
+-                            correlationStatus);
+-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
++                            correlationStatus,
++                            cent);
++          entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), false);
+           entryLcHadronGenInfo(false, false, 0);
+           entryLcHadronMlInfo(outputMl[0], outputMl[1]);
+@@ -503,6 +510,7 @@ struct HfCorrelatorLcHadrons {
+     } // end outer Lc loop
+     registry.fill(HIST("hZvtx"), collision.posZ());
+     registry.fill(HIST("hMultFT0M"), collision.multFT0M());
++    registry.fill(HIST("hCentFT0M"), cent);
+   }
+   PROCESS_SWITCH(HfCorrelatorLcHadrons, processData, "Process data", true);
+
+@@ -667,6 +675,7 @@ struct HfCorrelatorLcHadrons {
+         }
+         //}
+       }
++      float cent = 100.0; // will be updated later
+
+       // Lc-Hadron correlation dedicated section
+       // if the candidate is selected as Lc, search for Hadron ad evaluate correlations
+@@ -716,8 +725,9 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             track.pt() * track.sign(),
+                             poolBin,
+-                            correlationStatus);
+-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
++                            correlationStatus,
++                            cent);
++          entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), isLcSignal);
+           if (fillTrkPID) {
+             entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+@@ -746,8 +756,9 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             track.pt() * track.sign(),
+                             poolBin,
+-                            correlationStatus);
+-          entryLcHadronPairY(track.rapidity(MassProton) - hfHelper.yLc(candidate)); // only for proton as of now
++                            correlationStatus,
++                            cent);
++          entryLcHadronPairY(track.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), isLcSignal);
+           if (fillTrkPID) {
+             entryLcHadronPairTrkPID(track.tpcNSigmaPr(), track.tpcNSigmaKa(), track.tpcNSigmaPi(), track.tofNSigmaPr(), track.tofNSigmaKa(), track.tofNSigmaPi());
+@@ -790,6 +801,7 @@ struct HfCorrelatorLcHadrons {
+
+     bool isLcPrompt = false;
+     bool isLcNonPrompt = false;
++    float cent = 100.0; // will be updated later
+
+     // find leading particle
+     if (correlateLcWithLeadingParticle) {
+@@ -824,12 +836,12 @@ struct HfCorrelatorLcHadrons {
+
+       // prompt and non-prompt division
+       std::vector<int> listDaughters{};
+-      std::array<int, NDaughters> arrDaughLcPDG = {kProton, -kKPlus, kPiPlus};
+-      std::array<int, NDaughters> prongsId;
++      std::array<int, nDaughters> arrDaughLcPDG = {kProton, -kKPlus, kPiPlus};
++      std::array<int, nDaughters> prongsId;
+       listDaughters.clear();
+       RecoDecay::getDaughters(particle, &listDaughters, arrDaughLcPDG, 2);
+       int counterDaughters = 0;
+-      if (listDaughters.size() == NDaughters) {
++      if (listDaughters.size() == nDaughters) {
+         for (const auto& dauIdx : listDaughters) {
+           auto daughI = mcParticles.rawIteratorAt(dauIdx - mcParticles.offset());
+           counterDaughters += 1;
+@@ -878,7 +890,8 @@ struct HfCorrelatorLcHadrons {
+                           particle.pt() * chargeLc / std::abs(chargeLc),
+                           particleAssoc.pt() * chargeAssoc / std::abs(chargeAssoc),
+                           poolBin,
+-                          correlationStatus);
++                          correlationStatus,
++                          cent);
+         entryLcHadronPairY(particleAssoc.y() - yL);
+         entryLcHadronRecoInfo(MassLambdaCPlus, true);
+         entryLcHadronGenInfo(isLcPrompt, particleAssoc.isPhysicalPrimary(), trackOrigin);
+@@ -911,6 +924,8 @@ struct HfCorrelatorLcHadrons {
+         auto trackPos1 = trigLc.template prong0_as<TracksData>(); // positive daughter (negative for the antiparticles)
+         int8_t chargeLc = trackPos1.sign();                       // charge of 1st prong will be the charge of Lc candidate
+
++        float cent = 100.0; // will be updated later
++
+         std::vector<float> outputMl = {-1., -1., -1.};
+         // LcToPKPi and LcToPiKP division
+         if (trigLc.isSelLcToPKPi() >= selectionFlagLc) {
+@@ -919,7 +934,8 @@ struct HfCorrelatorLcHadrons {
+                             trigLc.pt() * chargeLc,
+                             assocParticle.pt() * assocParticle.sign(),
+                             poolBin,
+-                            correlationStatus);
++                            correlationStatus,
++                            cent);
+           entryLcHadronPairY(assocParticle.y() - hfHelper.yLc(trigLc));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(trigLc), false);
+           entryLcHadronGenInfo(false, false, 0);
+@@ -938,7 +954,8 @@ struct HfCorrelatorLcHadrons {
+                             trigLc.pt() * chargeLc,
+                             assocParticle.pt() * assocParticle.sign(),
+                             poolBin,
+-                            correlationStatus);
++                            correlationStatus,
++                            cent);
+           entryLcHadronPairY(assocParticle.y() - hfHelper.yLc(trigLc));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(trigLc), false);
+           entryLcHadronGenInfo(false, false, 0);
+@@ -1006,6 +1023,7 @@ struct HfCorrelatorLcHadrons {
+       registry.fill(HIST("hZvtx"), c1.posZ());
+       registry.fill(HIST("hTracksPoolBin"), poolBin);
+       registry.fill(HIST("hLcPoolBin"), poolBinLc);
++      float cent = 100.0; // will be updated later
+       for (const auto& [candidate, pAssoc] : o2::soa::combinations(o2::soa::CombinationsFullIndexPolicy(tracks1, tracks2))) {
+         if (std::abs(hfHelper.yLc(candidate)) > yCandMax || candidate.pt() < ptCandMin || candidate.pt() > ptCandMax) {
+           continue;
+@@ -1038,7 +1056,8 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             pAssoc.pt() * pAssoc.sign(),
+                             poolBin,
+-                            correlationStatus);
++                            correlationStatus,
++                            cent);
+           entryLcHadronPairY(pAssoc.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPKPi(candidate), isLcSignal);
+           entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
+@@ -1057,7 +1076,8 @@ struct HfCorrelatorLcHadrons {
+                             candidate.pt() * chargeLc,
+                             pAssoc.pt() * pAssoc.sign(),
+                             poolBin,
+-                            correlationStatus);
++                            correlationStatus,
++                            cent);
+           entryLcHadronPairY(pAssoc.y() - hfHelper.yLc(candidate));
+           entryLcHadronRecoInfo(hfHelper.invMassLcToPiKP(candidate), isLcSignal);
+           entryLcHadronGenInfo(isLcPrompt, isPhysicalPrimary, trackOrigin);
+@@ -1105,6 +1125,7 @@ struct HfCorrelatorLcHadrons {
+         }
+         int8_t chargeLc = pdg->GetParticle(candidate.pdgCode())->Charge();        // Retrieve charge
+         int8_t chargeAssoc = pdg->GetParticle(particleAssoc.pdgCode())->Charge(); // Retrieve charge
++        float cent = 100.0;                                                       // will be updated later
+
+         int trackOrigin = RecoDecay::getCharmHadronOrigin(mcParticles, particleAssoc, true);
+         bool isLcPrompt = candidate.originMcGen() == RecoDecay::OriginType::Prompt;
+@@ -1113,7 +1134,8 @@ struct HfCorrelatorLcHadrons {
+                           candidate.pt() * chargeLc / std::abs(chargeLc),
+                           particleAssoc.pt() * chargeAssoc / std::abs(chargeAssoc),
+                           poolBin,
+-                          correlationStatus);
++                          correlationStatus,
++                          cent);
+         entryLcHadronPairY(particleAssoc.y() - yL);
+         entryLcHadronRecoInfo(MassLambdaCPlus, true);
+         entryLcHadronGenInfo(isLcPrompt, particleAssoc.isPhysicalPrimary(), trackOrigin);
+diff --git a/PWGHF/HFC/Tasks/taskCorrelationLcHadrons.cxx b/PWGHF/HFC/Tasks/taskCorrelationLcHadrons.cxx
+index 84386ab97..6852733a5 100644
+--- a/PWGHF/HFC/Tasks/taskCorrelationLcHadrons.cxx
++++ b/PWGHF/HFC/Tasks/taskCorrelationLcHadrons.cxx
+@@ -14,7 +14,6 @@
+ /// \author Marianna Mazzilli <marianna.mazzilli@cern.ch>
+ /// \author Zhen Zhang <zhenz@cern.ch>
+
+-#include "PWGHF/Core/DecayChannels.h"
+ #include "PWGHF/Core/HfHelper.h"
+ #include "PWGHF/Core/SelectorCuts.h"
+ #include "PWGHF/DataModel/CandidateReconstructionTables.h"
+@@ -23,37 +22,11 @@
+ #include "PWGHF/HFC/Utils/utilsCorrelations.h"
+ #include "PWGHF/Utils/utilsAnalysis.h"
+
+-#include "Common/CCDB/EventSelectionParams.h"
+-#include "Common/Core/RecoDecay.h"
+-#include "Common/DataModel/EventSelection.h"
+-#include "Common/DataModel/Multiplicity.h"
+-#include "Common/DataModel/TrackSelectionTables.h"
+-
+-#include <CCDB/BasicCCDBManager.h>
+-#include <CommonConstants/MathConstants.h>
+-#include <CommonConstants/PhysicsConstants.h>
+-#include <Framework/ASoA.h>
+-#include <Framework/AnalysisDataModel.h>
+-#include <Framework/AnalysisHelpers.h>
+-#include <Framework/AnalysisTask.h>
+-#include <Framework/Configurable.h>
+-#include <Framework/HistogramRegistry.h>
+-#include <Framework/HistogramSpec.h>
+-#include <Framework/InitContext.h>
+-#include <Framework/Logger.h>
+-#include <Framework/OutputObjHeader.h>
+-#include <Framework/StepTHn.h>
+-#include <Framework/runDataProcessing.h>
+-
+-#include <TH1.h>
+-#include <TH2.h>
+-#include <THnSparse.h>
+-#include <TString.h>
+-
+-#include <chrono>
+-#include <cstddef>
+-#include <cstdint>
+-#include <cstdlib>
++#include "CCDB/BasicCCDBManager.h"
++#include "Framework/AnalysisTask.h"
++#include "Framework/HistogramRegistry.h"
++#include "Framework/runDataProcessing.h"
++
+ #include <memory> // std::shared_ptr
+ #include <string>
+ #include <vector>
+@@ -142,6 +115,7 @@ struct HfTaskCorrelationLcHadrons {
+   Configurable<float> ptDaughterMin{"ptDaughterMin", 0.1, "min. daughter pT"};
+   Configurable<bool> activateQA{"activateQA", false, "Flag to enable debug histogram"};
+   Configurable<int> nTpcCrossedRaws{"nTpcCrossedRaws", 70, "Number of crossed TPC Rows"};
++  Configurable<bool> isMultiplicityDependent{"isMultiplicityDependent", false, "Flag for multiplicity dependent analyses"};
+   // sign and invMasss
+   Configurable<bool> fillSignAndMass{"fillSignAndMass", false, "flag to select Lc-h corr with Lc invarient mass and sign of pairs"};
+   Configurable<bool> calSign{"calSign", false, "flag to calculate sign of pairs"};
+@@ -186,6 +160,7 @@ struct HfTaskCorrelationLcHadrons {
+   ConfigurableAxis binsPhi{"binsPhi", {64, -PIHalf, 3. * PIHalf}, "#it{#varphi}"};
+   ConfigurableAxis binsMultFT0M{"binsMultFT0M", {600, 0., 8000.}, "Multiplicity as FT0M signal amplitude"};
+   ConfigurableAxis binsPoolBin{"binsPoolBin", {9, 0., 9.}, "PoolBin"};
++  ConfigurableAxis binsCentFt0m{"binsCentFt0m", {100, 0., 100.}, "Centrality percentile (FT0M)"};
+
+   HistogramRegistry registry{"registry", {}, OutputObjHandlingPolicy::AnalysisObject};
+
+@@ -204,6 +179,8 @@ struct HfTaskCorrelationLcHadrons {
+     AxisSpec axisBdtScore = {binsBdtScore, "Bdt score"};
+     AxisSpec axisCorrelationState = {2, 0., 2., ""};
+     AxisSpec axisSignPair = {4, 1., 5.};
++    AxisSpec axisCentFT0M = {binsCentFt0m, "Centrality percentile (FT0M)"};
++
+     // Histograms for data analysis
+     registry.add("hBdtScorePrompt", "Lc BDT prompt score", {HistType::kTH1F, {axisBdtScore}});
+     registry.add("hBdtScoreBkg", "Lc BDT bkg score", {HistType::kTH1F, {axisBdtScore}});
+@@ -216,19 +193,32 @@ struct HfTaskCorrelationLcHadrons {
+       registry.add("hDeltaEtaPtIntSidebands", stringLcHadron + stringSideband + stringDeltaEta + "entries", {HistType::kTH1F, {axisDeltaEta}});
+       registry.add("hDeltaPhiPtIntSidebands", stringLcHadron + stringSideband + stringDeltaPhi + "entries", {HistType::kTH1F, {axisDeltaPhi}});
+       registry.add("hCorrel2DPtIntSidebands", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + "entries", {HistType::kTH2F, {{axisDeltaPhi}, {axisDeltaEta}}});
+-      registry.add("hCorrel2DVsPtSidebands", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
++      if (isMultiplicityDependent) {
++        registry.add("hCorrel2DVsPtSidebandsWithCentrality", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
++      } else {
++        registry.add("hCorrel2DVsPtSidebands", stringLcHadron + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
++      }
+       registry.add("hDeltaEtaPtIntSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaEta, {HistType::kTH1F, {axisDeltaEta}});
+       registry.add("hDeltaPhiPtIntSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi, {HistType::kTH1F, {axisDeltaPhi}});
+       registry.add("hDeltaEtaPtIntSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaEta, {HistType::kTH1F, {axisDeltaEta}});
+       registry.add("hDeltaPhiPtIntSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaPhi, {HistType::kTH1F, {axisDeltaPhi}});
+
+       if (!fillSign) {
+-        registry.add("hCorrel2DVsPtSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
+-        registry.add("hCorrel2DVsPtSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
+-        registry.add("hCorrel2DVsPtSignalRegion", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
+-        registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandLeft"))->Sumw2();
+-        registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandRight"))->Sumw2();
+-        registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegion"))->Sumw2();
++        if (isMultiplicityDependent) {
++          registry.add("hCorrel2DVsPtSidebandLeftWithCentrality", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
++          registry.add("hCorrel2DVsPtSidebandRightWithCentrality", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
++          registry.add("hCorrel2DVsPtSignalRegionWithCentrality", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}, {axisCentFT0M}}});
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandLeftWithCentrality"))->Sumw2();
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandRightWithCentrality"))->Sumw2();
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegionWithCentrality"))->Sumw2();
++        } else {
++          registry.add("hCorrel2DVsPtSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
++          registry.add("hCorrel2DVsPtSidebandRight", stringLcHadron + "Right" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisPoolBin}}});
++          registry.add("hCorrel2DVsPtSignalRegion", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + "entries", {HistType::kTHnSparseD, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisPoolBin}}});
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandLeft"))->Sumw2();
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandRight"))->Sumw2();
++          registry.get<THnSparse>(HIST("hCorrel2DVsPtSignalRegion"))->Sumw2();
++        }
+
+       } else {
+         registry.add("hCorrel2DVsPtSignSidebandLeft", stringLcHadron + "Left" + stringSideband + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + stringSign + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtLc}, {axisPtHadron}, {axisSignPair}, {axisPoolBin}}});
+@@ -243,7 +233,11 @@ struct HfTaskCorrelationLcHadrons {
+       registry.add("hTransverse", "Transverse invmass; ptLc; correlationState;entries", {HistType::kTH3F, {{axisMassLc}, {axisPtLc}, {axisCorrelationState}}});
+       registry.add("hAway", "Away invmass; ptLc; correlationState;entries", {HistType::kTH3F, {{axisMassLc}, {axisPtLc}, {axisCorrelationState}}});
+
+-      registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebands"))->Sumw2();
++      if (isMultiplicityDependent) {
++        registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebandsWithCentrality"))->Sumw2();
++      } else {
++        registry.get<THnSparse>(HIST("hCorrel2DVsPtSidebands"))->Sumw2();
++      }
+
+       if (fillSignAndMass) {
+         registry.add("hCorrel2DVsPtSignMass", stringLcHadron + stringSignal + stringDeltaPhi + stringDeltaEta + stringPtLc + stringPtHadron + stringSignMass + "entries", {HistType::kTHnSparseF, {{axisDeltaPhi}, {axisDeltaEta}, {axisPtCorr}, {axisPtHadron}, {axisMassLc}, {axisSignPair}, {axisPoolBin}}});
+@@ -442,6 +436,7 @@ struct HfTaskCorrelationLcHadrons {
+     for (const auto& pairEntry : pairEntries) {
+       // define variables for widely used quantities
+       float deltaPhi = pairEntry.deltaPhi();
++      float centr = pairEntry.cent();
+       float deltaEta = pairEntry.deltaEta();
+       double ptLc = std::abs(pairEntry.ptLc());
+       double ptHadron = std::abs(pairEntry.ptHadron());
+@@ -510,7 +505,12 @@ struct HfTaskCorrelationLcHadrons {
+         if (fillSign) {
+           registry.fill(HIST("hCorrel2DVsPtSignSignalRegion"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
+         } else {
+-          registry.fill(HIST("hCorrel2DVsPtSignalRegion"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++
++          if (isMultiplicityDependent) {
++            registry.fill(HIST("hCorrel2DVsPtSignalRegionWithCentrality"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, centr, efficiencyWeight);
++          } else {
++            registry.fill(HIST("hCorrel2DVsPtSignalRegion"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++          }
+         }
+         registry.fill(HIST("hCorrel2DPtIntSignalRegion"), deltaPhi, deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaEtaPtIntSignalRegion"), deltaEta, efficiencyWeight);
+@@ -521,11 +521,19 @@ struct HfTaskCorrelationLcHadrons {
+         if (fillSign) {
+           registry.fill(HIST("hCorrel2DVsPtSignSidebandLeft"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
+         } else {
+-          registry.fill(HIST("hCorrel2DVsPtSidebandLeft"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++          if (isMultiplicityDependent) {
++            registry.fill(HIST("hCorrel2DVsPtSidebandLeftWithCentrality"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, centr, efficiencyWeight);
++          } else {
++            registry.fill(HIST("hCorrel2DVsPtSidebandLeft"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++          }
+         }
+         registry.fill(HIST("hDeltaEtaPtIntSidebandLeft"), deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaPhiPtIntSidebandLeft"), deltaPhi, efficiencyWeight);
+-        registry.fill(HIST("hCorrel2DVsPtSidebands"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++        if (isMultiplicityDependent) {
++          registry.fill(HIST("hCorrel2DVsPtSidebandsWithCentrality"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, centr, efficiencyWeight);
++        } else {
++          registry.fill(HIST("hCorrel2DVsPtSidebands"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++        }
+         registry.fill(HIST("hCorrel2DPtIntSidebands"), deltaPhi, deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaEtaPtIntSidebands"), deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaPhiPtIntSidebands"), deltaPhi, efficiencyWeight);
+@@ -535,11 +543,19 @@ struct HfTaskCorrelationLcHadrons {
+         if (fillSign) {
+           registry.fill(HIST("hCorrel2DVsPtSignSidebandRight"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
+         } else {
+-          registry.fill(HIST("hCorrel2DVsPtSidebandRight"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++          if (isMultiplicityDependent) {
++            registry.fill(HIST("hCorrel2DVsPtSidebandRightWithCentrality"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, centr, efficiencyWeight);
++          } else {
++            registry.fill(HIST("hCorrel2DVsPtSidebandRight"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++          }
+         }
+         registry.fill(HIST("hDeltaEtaPtIntSidebandRight"), deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaPhiPtIntSidebandRight"), deltaPhi, efficiencyWeight);
+-        registry.fill(HIST("hCorrel2DVsPtSidebands"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++        if (isMultiplicityDependent) {
++          registry.fill(HIST("hCorrel2DVsPtSidebandsWithCentrality"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, centr, efficiencyWeight);
++        } else {
++          registry.fill(HIST("hCorrel2DVsPtSidebands"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
++        }
+         registry.fill(HIST("hCorrel2DPtIntSidebands"), deltaPhi, deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaEtaPtIntSidebands"), deltaEta, efficiencyWeight);
+         registry.fill(HIST("hDeltaPhiPtIntSidebands"), deltaPhi, efficiencyWeight);
+@@ -697,13 +713,13 @@ struct HfTaskCorrelationLcHadrons {
+         registry.fill(HIST("hDeltaPhiPtIntSignalRegionMcRec"), deltaPhi, efficiencyWeight);
+         if (isPhysicalPrimary) {
+           registry.fill(HIST("hCorrel2DVsPtPhysicalPrimaryMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, statusLcPrompt, poolBin, efficiencyWeight);
+-          if (statusLcPrompt == 1 && statusPromptHadron == 1) {
++          if (statusLcPrompt == 1 && statusPromptHadron == RecoDecay::OriginType::Prompt) {
+             if (fillSign) {
+               registry.fill(HIST("hCorrel2DVsPtSignSignalRegionPromptLcPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
+             } else {
+               registry.fill(HIST("hCorrel2DVsPtSignalRegionPromptLcPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin, efficiencyWeight);
+             }
+-          } else if (statusLcPrompt == 0 && statusPromptHadron == 2) {
++          } else if (statusLcPrompt == 0 && statusPromptHadron == RecoDecay::OriginType::NonPrompt) {
+             if (fillSign) {
+               registry.fill(HIST("hCorrel2DVsPtSignSignalRegionNonPromptLcNonPromptHadronMcRec"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin, efficiencyWeight);
+             } else {
+@@ -796,7 +812,7 @@ struct HfTaskCorrelationLcHadrons {
+         } else {
+           registry.fill(HIST("hCorrel2DVsPtMcGenPrompt"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin);
+         }
+-        if (statusPromptHadron == 1) {
++        if (statusPromptHadron == RecoDecay::OriginType::Prompt) {
+           if (fillSign) {
+             registry.fill(HIST("hCorrel2DVsPtSignMcGenPromptLcPromptHadron"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin);
+           } else {
+@@ -809,7 +825,7 @@ struct HfTaskCorrelationLcHadrons {
+         } else {
+           registry.fill(HIST("hCorrel2DVsPtMcGenNonPrompt"), deltaPhi, deltaEta, ptLc, ptHadron, poolBin);
+         }
+-        if (statusPromptHadron == 2) {
++        if (statusPromptHadron == RecoDecay::OriginType::NonPrompt) {
+           if (fillSign) {
+             registry.fill(HIST("hCorrel2DVsPtSignMcGenNonPromptLcNonPromptHadron"), deltaPhi, deltaEta, ptLc, ptHadron, signPair, poolBin);
+           } else {
