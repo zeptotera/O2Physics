@@ -16,9 +16,9 @@
 #ifndef PWGHF_HFC_DATAMODEL_CORRELATIONTABLES_H_
 #define PWGHF_HFC_DATAMODEL_CORRELATIONTABLES_H_
 
-
 #include "PWGHF/DataModel/CandidateReconstructionTables.h" // IWYU pragma: keep
 #include "PWGHF/DataModel/CandidateReconstructionTables.h" // NOLINT
+
 #include "Common/Core/RecoDecay.h"
 
 #include <CommonConstants/MathConstants.h>

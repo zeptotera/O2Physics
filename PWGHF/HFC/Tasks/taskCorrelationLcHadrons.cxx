@@ -14,7 +14,6 @@
 /// \author Marianna Mazzilli <marianna.mazzilli@cern.ch>
 /// \author Zhen Zhang <zhenz@cern.ch>
 
-
 #include "PWGHF/Core/DecayChannels.h"
 #include "PWGHF/Core/HfHelper.h"
 #include "PWGHF/Core/SelectorCuts.h"
@@ -30,6 +29,10 @@
 #include "Common/DataModel/Multiplicity.h"
 #include "Common/DataModel/TrackSelectionTables.h"
 
+#include "CCDB/BasicCCDBManager.h"
+#include "Framework/AnalysisTask.h"
+#include "Framework/HistogramRegistry.h"
+#include "Framework/runDataProcessing.h"
 #include <CCDB/BasicCCDBManager.h>
 #include <CommonConstants/MathConstants.h>
 #include <CommonConstants/PhysicsConstants.h>
@@ -55,11 +58,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
-#include "CCDB/BasicCCDBManager.h"
-#include "Framework/AnalysisTask.h"
-#include "Framework/HistogramRegistry.h"
-#include "Framework/runDataProcessing.h"
-
 #include <memory> // std::shared_ptr
 #include <string>
 #include <vector>
